@@ -2289,4 +2289,4 @@ class IHydra extends Hydra {
   }
 }
 
-module.exports = new IHydra;
+module.exports = IHydra; // new IHydra
