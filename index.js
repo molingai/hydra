@@ -242,6 +242,7 @@ class Hydra extends EventEmitter {
    * @return {object} promise - resolving if init success or rejecting otherwise
    */
   _init(config) {
+    // console.log('config', config)
     return new Promise((resolve, reject) => {
       let ready = () => {
         Promise.series(this.registeredPlugins, (plugin) => plugin.onServiceReady()).then((..._results) => {
@@ -2287,6 +2288,116 @@ class IHydra extends Hydra {
   getConfigHelper() {
     return super._getConfigHelper();
   }
+
+  /*
+  {
+  "to":"3a5c26ac01b2441b942c224655cd7aef@service1:/",
+  "frm":"service2:/",
+  "mid":"l9rm17wuxv",
+  "rmid":"0a076c72-0f63-420f-bfac-352c709c3346",
+  "ts":"2022-03-03T02:57:54.492Z",
+  "ver":"UMF/1.4.6",
+  "bdy":{"name":"i got it"}
+  }
+  变成
+  {
+  "name":"i got it",
+  rawMsg: {
+      "to":"3a5c26ac01b2441b942c224655cd7aef@service1:/",
+      "frm":"service2:/",
+      "mid":"l9rm17wuxv",
+      "rmid":"0a076c72-0f63-420f-bfac-352c709c3346",
+      "ts":"2022-03-03T02:57:54.492Z",
+      "ver":"UMF/1.4.6",
+      "bdy":{"name":"i got it"}
+  }
+  }
+  */
+  _splitBdyFromMsg (msg) {
+    const bdy = Object.assign({}, msg.bdy)
+    // delete msg.bdy
+    bdy.rawMsg = msg
+    return bdy
+  }
+
+  proxyMessage (callback) {
+    this._resolves = {}
+    // 其它服务发消息给我
+    this.on('message', function(msg) {
+        /*
+        {
+        "to":"3a5c26ac01b2441b942c224655cd7aef@service1:/",
+        "frm":"service2:/",
+        "mid":"l9rm17wuxv",
+        "rmid":"0a076c72-0f63-420f-bfac-352c709c3346",
+        "ts":"2022-03-03T02:57:54.492Z",
+        "ver":"UMF/1.4.6",
+        "bdy":{"name":"i got it"}
+        }
+        */
+        if (msg.rmid) {
+            // console.log('receive reply msg', msg)
+            if (this._resolves[msg.rmid]) {
+                const bdy = this._splitBdyFromMsg(msg)
+                this._resolves[msg.rmid](bdy)
+                delete this._resolves[msg.rmid]
+            } else {
+                // 可能过时了, 不要管
+            }
+            return
+        }
+        // 不是回复的消息, 是请求的消息
+        else {
+            // console.log('receive msg', msg)
+            callback(msg.typ, msg.bdy, msg)
+        }
+    })
+  }
+
+  // 调接口
+  async call (method, bdy, toServiceName, toInstanceId) {
+    let msg = await this.send(method, bdy, toServiceName, toInstanceId)
+    // console.log('this.config.timeout', this.config.timeout)
+    // console.log('ret', ret)
+    return new Promise((resolve, reject) => {
+        this._resolves[msg.mid] = resolve
+        // 过时就reject
+        setTimeout(() => {
+            if (this._resolves[msg.mid]) {
+                delete this._resolves[msg.mid]
+                // console.error('timeout', msg)
+                reject(new Error('timeout'))
+            }
+        }, this.config.timeout || 5000)
+    })
+  }
+
+  // 仅发送
+  async send(method, bdy, toServiceName, toInstanceId) {
+    const to = `${toServiceName}:/`
+    if (toInstanceId) {
+        to = `${toInstanceId}@${to}`
+    }
+    const frm = `${this.getInstanceID()}@${this.getServiceName()}:/`
+    let msg = this.createUMFMessage({
+        typ: method,
+        to,
+        frm,
+        bdy
+    });
+    // let shortMsg = msg.toShort()
+    // console.log('send msg', shortMsg)
+    await this.sendMessage(msg)
+    return msg
+  }
+
+  // 回复
+  async reply(bdy, preMsg) {
+    return this.sendReplyMessage(preMsg, this.createUMFMessage({
+      bdy
+    }))
+  }
+
 }
 
 module.exports = IHydra; // new IHydra
