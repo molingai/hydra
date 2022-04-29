@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 
-interface Message {
+export interface Message {
   /**
    * from
    */
@@ -26,12 +26,12 @@ interface Message {
   /**
    * version
    */
-  ver?: string // 
+  ver?: string //
 
   /**
    * timestamp
    */
-  ts?: number // 
+  ts?: number //
 
   /**
    * headers
@@ -58,7 +58,7 @@ interface Message {
 }
 
 // {"to":"f42089cc42374806b2d1db2b0b215353@service1:/","frm":"service2:/","mid":"332c1b99-0a3d-4c99-b414-1f1f031d49de","rmid":"0a6729c9-9337-448d-9c33-37cec96ee579","ts":"2022-04-27T09:40:53.488Z","ver":"UMF/1.4.6","bdy":{"name":"i got it"}}
-interface MessageReceive {
+export interface MessageReceive {
   /**
    * from
    */
@@ -90,7 +90,7 @@ interface MessageReceive {
    * reply message id
    */
   rmid?: string
-  
+
   /**
    * headers
    */
@@ -109,7 +109,7 @@ interface MessageReceive {
   aut?: string
 }
 
-type CallReply = {
+export type CallReply = {
   rawMsg: MessageReceive,
   [name: string]: any
 }
@@ -117,7 +117,7 @@ type CallReply = {
 interface IUMFHash {
   [name: string]: any
 };
-class UMFMessage extends Message {
+export class UMFMessage extends Message {
   public message: IUMFHash = {};
   getTimeStamp(): number
   createMessageID(): string
@@ -126,15 +126,15 @@ class UMFMessage extends Message {
   toShort(): any
 }
 
-type ServiceRet = {
+export type ServiceRet = {
   serviceName: string // this.serviceName,
   serviceIP: string // this.config.serviceIP,
   servicePort: number // this.config.servicePort
 }
 
-type Service = {
+export type Service = {
   serviceName: string,
- 
+
   /**
    * '2022-04-27T10:15:41.541Z'
    */
@@ -146,7 +146,7 @@ type Service = {
     type?: string,
 }
 
-type Presence = {
+export type Presence = {
   serviceName: string // 'service1',
   serviceDescription: string // 'not specified',
   version: string // 'unspecified',
@@ -181,7 +181,7 @@ export default class Hydra extends EventEmitter {
    * @return {object} promise - resolving if init success or rejecting otherwise
    */
   init(config: any, testMode?: string): Promise<any> // any 是最终的config
-  
+
   // on(eventName: string, cb: (msg: any) => void)
   on(event: string | symbol, listener: (msg: MessageReceive) => void): this;
 
@@ -196,7 +196,7 @@ export default class Hydra extends EventEmitter {
    * @return {object} message - a UMF formatted message.
    */
   createUMFMessage(message: Message): UMFMessage
-  
+
   /**
    * @name sendMessage
    * @summary Sends a message to all present instances of a  hydra service.
@@ -279,7 +279,7 @@ export default class Hydra extends EventEmitter {
   /**
    * @name hasServicePresence
    * @summary Indicate if a service has presence.
-   * @description Indicates if a service has presence, meaning the 
+   * @description Indicates if a service has presence, meaning the
    *              service is running in at least one node.
    * @param {string} name - service name - note service name is case insensitive
    * @return {promise} promise - which resolves with TRUE if presence is found, FALSE otherwise
@@ -311,5 +311,6 @@ export default class Hydra extends EventEmitter {
   }
   */
   call (method: string, bdy: any, toServiceName: string, toInstanceId?: string): Promise<CallReply>
-  reply (bdy: any, preMsg: Message | MessageReceive): Promise<void>
+  reply (bdy: any, preMsg: Message): Promise<void>
+  send (method: string, bdy: any, toServiceName: string, toInstanceId?: string): Promise<UMFMessage>
 }
