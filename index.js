@@ -791,7 +791,7 @@ class Hydra extends EventEmitter {
     let map = {};
     let memory = util.inspect(process.memoryUsage());
 
-    memory = memory.replace(/[\ \{\}.|\n]/g, '');
+    memory = memory.replace(/[ {}.|\n]/g, '');
     lines = memory.split(',');
     lines.forEach((line) => {
       keyval = line.split(':');
@@ -1760,7 +1760,7 @@ class Hydra extends EventEmitter {
       // No port given, get unassigned port from standard ranges
       if (typeof port === 'undefined' || !port || port == 0) {
         port = '1024-65535';
-      } else if (! /-|,/.test(port.toString())) {
+      } else if (!/-|,/.test(port.toString())) {
         // Specific port given, skip free port check
         resolve(port.toString());
         return;
@@ -2313,17 +2313,17 @@ class IHydra extends Hydra {
   }
   }
   */
-  _splitBdyFromMsg (msg) {
+  _splitBdyFromMsg(msg) {
     const bdy = Object.assign({}, msg.bdy)
     // delete msg.bdy
     bdy.rawMsg = msg
     return bdy
   }
 
-  proxyMessage (callback) {
+  proxyMessage(callback) {
     this._resolves = {}
     // 其它服务发消息给我
-    this.on('message', function(msg) {
+    this.on('message', (msg) => {
         /*
         {
         "to":"3a5c26ac01b2441b942c224655cd7aef@service1:/",
@@ -2355,7 +2355,7 @@ class IHydra extends Hydra {
   }
 
   // 调接口
-  async call (method, bdy, toServiceName, toInstanceId) {
+  async call(method, bdy, toServiceName, toInstanceId) {
     let msg = await this.send(method, bdy, toServiceName, toInstanceId)
     // console.log('this.config.timeout', this.config.timeout)
     // console.log('ret', ret)
@@ -2374,7 +2374,7 @@ class IHydra extends Hydra {
 
   // 仅发送
   async send(method, bdy, toServiceName, toInstanceId) {
-    const to = `${toServiceName}:/`
+    let to = `${toServiceName}:/`
     if (toInstanceId) {
         to = `${toInstanceId}@${to}`
     }
