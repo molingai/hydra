@@ -97,7 +97,6 @@
     "mocha": true
   },
   "globals": {
-    "-": 0,
     "define": true,
     "expect": true,
     "it": true,

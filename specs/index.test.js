@@ -4,7 +4,7 @@ require('./helpers/chai.js');
 
 let hydra;
 const version = require('../package.json').version;
-const redis = require('redis-mock');
+// const redis = require('redis-mock');
 const redisPort = 6379;
 const redisUrl = '127.0.0.1';
 const SECOND = 1000;
@@ -25,7 +25,7 @@ function getConfig() {
       'redis': {
         'url': redisUrl,
         'port': redisPort,
-        'db': 0
+        'db': 1 // for test
       }
     },
     version
@@ -47,7 +47,7 @@ describe('Hydra Main', function() {
   beforeEach(() => {
     const Hydra = require('../index.js');
     hydra = new Hydra();
-    redis.removeAllListeners('message');
+    // redis.removeAllListeners('message');
   });
 
   afterEach((done) => {
@@ -170,20 +170,23 @@ describe('Hydra Main', function() {
   it('should be able to register as a service', (done) => {
     hydra.init(getConfig(), true)
       .then(() => {
-        let r = redis.createClient();
-        hydra.registerService()
-          .then((_serviceInfo) => {
-            setTimeout(() => {
-              r.keys('*', (err, data) => {
-                expect(err).to.be.null;
-                expect(data.length).to.equal(3);
-                expect(data).to.include('hydra:service:test-service:service');
-                expect(data).to.include('hydra:service:nodes');
-                done();
-              });
-              r.quit();
-            }, SECOND);
-          });
+        hydra.redisdb.flushdb((err) => {
+          expect(err).to.be.null;
+          hydra.registerService()
+            .then((_serviceInfo) => {
+              setTimeout(() => {
+                hydra.redisdb.keys('*', (err, data) => {
+                  console.log(getConfig(), _serviceInfo, data);
+                  expect(err).to.be.null;
+                  expect(data.length).to.equal(3);
+                  expect(data).to.include('hydra:service:test-service:service');
+                  expect(data).to.include('hydra:service:nodes');
+                  done();
+                });
+                hydra.redisdb.quit();
+              }, SECOND);
+            });
+        });
       });
   });
 
@@ -267,27 +270,30 @@ describe('Hydra Main', function() {
   it('should update presence', (done) => {
     hydra.init(getConfig(), true)
       .then(() => {
-        let r = redis.createClient();
-        hydra.registerService()
-          .then((_serviceInfo) => {
-            let instanceID = hydra.getInstanceID();
-            r.hget('hydra:service:nodes', instanceID, (err, data) => {
-              expect(err).to.be.null;
-              expect(data).to.not.be.null;
+        // let r = redis.createClient();
+        hydra.redisdb.flushdb((err) => {
+          expect(err).to.be.null;
+          hydra.registerService()
+            .then((_serviceInfo) => {
+              let instanceID = hydra.getInstanceID();
+              hydra.redisdb.hget('hydra:service:nodes', instanceID, (err, data) => {
+                expect(err).to.be.null;
+                expect(data).to.not.be.null;
 
-              let entry = JSON.parse(data);
-              setTimeout(() => {
-                r.hget('hydra:service:nodes', instanceID, (err, data) => {
-                  expect(err).to.be.null;
-                  expect(data).to.not.be.null;
-                  let entry2 = JSON.parse(data);
-                  expect(entry2.updatedOn).to.not.equal(entry.updatedOn);
-                  r.quit();
-                  done();
-                });
-              }, SECOND);
+                let entry = JSON.parse(data);
+                setTimeout(() => {
+                  hydra.redisdb.hget('hydra:service:nodes', instanceID, (err, data) => {
+                    expect(err).to.be.null;
+                    expect(data).to.not.be.null;
+                    let entry2 = JSON.parse(data);
+                    expect(entry2.updatedOn).to.not.equal(entry.updatedOn);
+                    hydra.redisdb.quit();
+                    done();
+                  });
+                }, SECOND);
+              });
             });
-          });
+        });
       });
   });
 
@@ -297,14 +303,14 @@ describe('Hydra Main', function() {
   it('should expire redis keys on shutdown', (done) => {
     hydra.init(getConfig(), true)
       .then(() => {
-        let r = redis.createClient();
+        // let r = redis.createClient();
         hydra.registerService()
           .then((_serviceInfo) => {
             setTimeout(() => {
-              r.get('hydra:service:test-service:73909f8c96a9d08e876411c0a212a1f4:presence', (err, _data) => {
+              hydra.redisdb.get('hydra:service:test-service:73909f8c96a9d08e876411c0a212a1f4:presence', (err, _data) => {
                 expect(err).to.be.null;
                 done();
-                r.quit();
+                hydra.redisdb.quit();
               });
             }, SECOND * 5);
           });
@@ -366,6 +372,7 @@ describe('Hydra Main', function() {
           .then((_serviceInfo) => {
             hydra.getServicePresence('test-service')
               .then((data) => {
+                console.log('getServicePresence', data);
                 expect(data).to.not.be.null;
                 expect(data.length).to.be.above(0);
                 expect(data[0]).to.have.property('processID');

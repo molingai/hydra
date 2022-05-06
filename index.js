@@ -360,7 +360,7 @@ class Hydra extends EventEmitter {
       clearInterval(this.healthTimerInterval);
 
       const promises = [];
-      if (!this.testMode) {
+      if (!this.testMode && this.redisdb) {
         this._logMessage('error', 'Service is shutting down.');
         this.redisdb.batch()
           .expire(`${redisPreKey}:${this.serviceName}:${this.instanceID}:health`, KEY_EXPIRATION_TTL)
@@ -1923,6 +1923,7 @@ class IHydra extends Hydra {
    * @return {object} promise - resolving if init success or rejecting otherwise
    */
   init(config, testMode = false) {
+    testMode = false;
     return super.init(config, testMode);
   }
 
