@@ -315,7 +315,7 @@ describe('Hydra Main', function() {
                 done();
                 // hydra.redisdb.quit(); // afterEach 会shutdown
               });
-            }, SECOND * 5);
+            }, SECOND * 1);
           });
       });
   });

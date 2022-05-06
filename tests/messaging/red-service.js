@@ -1,6 +1,4 @@
-'use strict';
-
-const hydra = require('../../index');
+const Hydra = require('../../index');
 
 const config = {
   hydra: {
@@ -17,7 +15,8 @@ const config = {
   }
 };
 
-hydra.init(config.hydra)
+const hydra =  new Hydra()
+hydra.init(config)
   .then(() => {
     hydra.registerService()
       .then((serviceInfo) => {
