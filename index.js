@@ -2,13 +2,13 @@
 
 const debug = require('debug')('hydra');
 
-const Promise = require('bluebird');
-Promise.series = (iterable, action) => {
-  return Promise.mapSeries(
-    iterable.map(action),
-    (value, index, _length) => value || iterable[index].name || null
-  );
-};
+// const Promise = require('bluebird');
+// Promise.series = (iterable, action) => {
+//   return Promise.mapSeries(
+//     iterable.map(action),
+//     (value, index, _length) => value || iterable[index].name || null
+//   );
+// };
 
 const EventEmitter = require('events');
 const util = require('util');
@@ -79,8 +79,13 @@ class Hydra extends EventEmitter {
    * @param {...object} plugins - plugins to register
    * @return {object} - Promise which will resolve when all plugins are registered
    */
-  use(...plugins) {
-    return Promise.series(plugins, (plugin) => this._registerPlugin(plugin));
+  async use(...plugins) {
+      let rets = []
+      for (let plugin of plugins) {
+          rets.push(await this._registerPlugin(plugin))
+      }
+      return rets
+    // return Promise.series(plugins, (plugin) => this._registerPlugin(plugin));
   }
 
   /**
@@ -99,28 +104,39 @@ class Hydra extends EventEmitter {
    * @summary Register plugins then continue initialization
    * @param {mixed} config - a string with a path to a configuration file or an
    *                         object containing hydra specific keys/values
-   * @param {boolean} testMode - whether hydra is being started in unit test mode
    * @return {object} promise - resolves with this._init or rejects with an appropriate
    *                  error if something went wrong
    */
-  init(config, testMode) {
+  init(config) {
     // Reject() if we've already been called successfully
     if (INSTANCE_ID_NOT_SET !== this.instanceID) {
       return Promise.reject(new Error('Hydra.init() already invoked'));
     }
 
-    this.testMode = testMode;
-
     if (typeof config === 'string') {
       const configHelper = require('./lib/config');
       return configHelper.init(config)
         .then(() => {
-          return this.init(configHelper.getObject(), testMode);
+          return this.init(configHelper.getObject());
         });
     }
 
     const initPromise = new Promise((resolve, reject) => {
-      let loader = (newConfig) => {
+      let loader = async (newConfig) => {
+
+          try {
+              let _results = []
+              for (let plugin of this.registeredPlugins) {
+                  _results.push(await plugin.setConfig(newConfig.hydra))
+              }
+              await this._init(newConfig.hydra)
+              return resolve(newConfig)
+          } catch(err) {
+              this._logMessage('error', err.toString());
+                reject(err);
+          }
+
+          /*
         return Promise.series(this.registeredPlugins, (plugin) => plugin.setConfig(newConfig.hydra))
           .then((..._results) => {
             return this._init(newConfig.hydra);
@@ -133,6 +149,7 @@ class Hydra extends EventEmitter {
             this._logMessage('error', err.toString());
             reject(err);
           });
+          */
       };
 
       if (!config || !config.hydra) {
@@ -244,13 +261,22 @@ class Hydra extends EventEmitter {
   _init(config) {
     // console.log('config', config)
     return new Promise((resolve, reject) => {
-      let ready = () => {
-        Promise.series(this.registeredPlugins, (plugin) => plugin.onServiceReady()).then((..._results) => {
-          resolve();
-        }).catch((err) => {
-          this._logMessage('error', err.toString());
-          reject(err);
-        });
+      let ready = async () => {
+          try {
+              for (let plugin of this.registeredPlugins) {
+                  await plugin.onServiceReady()
+              }
+              resolve();
+          } catch(err) {
+              this._logMessage('error', err.toString());
+              reject(err);
+          }
+        // Promise.series(this.registeredPlugins, (plugin) => plugin.onServiceReady()).then((..._results) => {
+        //   resolve();
+        // }).catch((err) => {
+        //   this._logMessage('error', err.toString());
+        //   reject(err);
+        // });
       };
       this.config = config;
       this._connectToRedis(this.config).then(() => {
@@ -354,42 +380,35 @@ class Hydra extends EventEmitter {
    * @summary Shutdown hydra safely.
    * @return {undefined}
    */
-  _shutdown() {
-    return new Promise((resolve) => {
-      clearInterval(this.presenceTimerInteval);
-      clearInterval(this.healthTimerInterval);
+  async _shutdown() {
+    clearInterval(this.presenceTimerInteval);
+    clearInterval(this.healthTimerInterval);
 
-      const promises = [];
-      if (!this.testMode && this.redisdb) {
-        this._logMessage('error', 'Service is shutting down.');
-        this.redisdb.batch()
-          .expire(`${redisPreKey}:${this.serviceName}:${this.instanceID}:health`, KEY_EXPIRATION_TTL)
-          .expire(`${redisPreKey}:${this.serviceName}:${this.instanceID}:health:log`, ONE_WEEK_IN_SECONDS)
-          .exec();
+    const promises = [];
+    if (this.redisdb) {
+      this._logMessage('error', 'Service is shutting down.');
+      promises.push(this.redisdb[Utils.getBatchOrPipeline(this.redisdb)]()
+        .expire(`${redisPreKey}:${this.serviceName}:${this.instanceID}:health`, KEY_EXPIRATION_TTL)
+        .expire(`${redisPreKey}:${this.serviceName}:${this.instanceID}:health:log`, ONE_WEEK_IN_SECONDS)
+        .exec());
 
-        if (this.mcMessageChannelClient) {
-          promises.push(this.mcMessageChannelClient.quitAsync());
-        }
-        if (this.mcDirectMessageChannelClient) {
-          promises.push(this.mcDirectMessageChannelClient.quitAsync());
-        }
-        if (this.publishChannel) {
-          promises.push(this.publishChannel.quitAsync());
-        }
+      if (this.mcMessageChannelClient) {
+        promises.push(this.mcMessageChannelClient.quit());
       }
-      if (this.redisdb) {
-        this.redisdb.del(`${redisPreKey}:${this.serviceName}:${this.instanceID}:presence`, () => {
-          this.redisdb.quit();
-          Promise.all(promises).then(resolve);
-        });
-        this.redisdb.quit();
-        Promise.all(promises).then(resolve);
-      } else {
-        Promise.all(promises).then(resolve);
+      if (this.mcDirectMessageChannelClient) {
+        promises.push(this.mcDirectMessageChannelClient.quit());
       }
-      this.initialized = false;
-      this.instanceID = INSTANCE_ID_NOT_SET;
-    });
+      if (this.publishChannel) {
+        promises.push(this.publishChannel.quit());
+      }
+
+      promises.push(this.redisdb.del(`${redisPreKey}:${this.serviceName}:${this.instanceID}:presence`));
+      await Promise.all(promises);
+      await this.redisdb.quit();
+    }
+
+    this.initialized = false;
+    this.instanceID = INSTANCE_ID_NOT_SET;
   }
 
   /**
@@ -402,7 +421,7 @@ class Hydra extends EventEmitter {
   _connectToRedis(config) {
     let retryStrategy = config.redis.retry_strategy;
     delete config.redis.retry_strategy;
-    let redisConnection = new RedisConnection(config.redis, 0, this.testMode);
+    let redisConnection = new RedisConnection(config.redis, 0);
     HYDRA_REDIS_DB = redisConnection.redisConfig.db;
     return redisConnection.connect(retryStrategy)
       .then((client) => {
@@ -432,36 +451,35 @@ class Hydra extends EventEmitter {
    */
   _getKeys(pattern) {
     return new Promise((resolve, _reject) => {
-      if (this.testMode) {
-        this.redisdb.keys(pattern, (err, result) => {
-          if (err) {
-            resolve([]);
+      // if (this.testMode) {
+      //   this.redisdb.keys(pattern, (err, result) => {
+      //     if (err) {
+      //       resolve([]);
+      //     } else {
+      //       resolve(result);
+      //     }
+      //   });
+      // } else {
+      let doScan = (cursor, pattern, retSet) => {
+        this.redisdb.scan(cursor, 'MATCH', pattern, 'COUNT', KEYS_PER_SCAN, (err, result) => {
+          if (!err) {
+            cursor = result[0];
+            let keys = result[1];
+            keys.forEach((key, _i) => {
+              retSet.add(key);
+            });
+            if (cursor === '0') {
+              resolve(Array.from(retSet));
+            } else {
+              doScan(cursor, pattern, retSet);
+            }
           } else {
-            resolve(result);
+            resolve([]);
           }
         });
-      } else {
-        let doScan = (cursor, pattern, retSet) => {
-          this.redisdb.scan(cursor, 'MATCH', pattern, 'COUNT', KEYS_PER_SCAN, (err, result) => {
-            if (!err) {
-              cursor = result[0];
-              let keys = result[1];
-              keys.forEach((key, _i) => {
-                retSet.add(key);
-              });
-              if (cursor === '0') {
-                resolve(Array.from(retSet));
-              } else {
-                doScan(cursor, pattern, retSet);
-              }
-            } else {
-              resolve([]);
-            }
-          });
-        };
-        let results = new Set();
-        doScan('0', pattern, results);
-      }
+      };
+      let results = new Set();
+      doScan('0', pattern, results);
     });
   }
 
@@ -523,21 +541,22 @@ class Hydra extends EventEmitter {
         type: this.config.serviceType,
         registeredOn: this._getTimeStamp()
       });
-      this.redisdb.set(`${redisPreKey}:${serviceName}:service`, serviceEntry, (err, _result) => {
+      this.redisdb.set(`${redisPreKey}:${serviceName}:service`, serviceEntry, async(err, _result) => {
         if (err) {
           let msg = 'Unable to set :service key in Redis db.';
           this._logMessage('error', msg);
           reject(new Error(msg));
         } else {
-          let testRedis;
-          if (this.testMode) {
-            let redisConnection;
-            redisConnection = new RedisConnection(this.config.redis, 0, this.testMode);
-            testRedis = redisConnection.getRedis();
-          }
+          // let testRedis;
+          // if (this.testMode) {
+          //   let redisConnection;
+          //   redisConnection = new RedisConnection(this.config.redis, 0, this.testMode);
+          //   testRedis = redisConnection.getRedis();
+          // }
           // Setup service message courier channels
-          this.mcMessageChannelClient = this.testMode ? testRedis.createClient() : this.redisdb.duplicate();
-          this.mcMessageChannelClient.subscribe(`${mcMessageKey}:${serviceName}`);
+          this.mcMessageChannelClient = this.redisdb.duplicate();
+          // 必须要await, 不然shutdown可能报Connection closed
+          await this.mcMessageChannelClient.subscribe(`${mcMessageKey}:${serviceName}`);
           this.mcMessageChannelClient.on('message', (channel, message) => {
             let msg = Utils.safeJSONParse(message);
             if (msg) {
@@ -546,8 +565,9 @@ class Hydra extends EventEmitter {
             }
           });
 
-          this.mcDirectMessageChannelClient = this.testMode ? testRedis.createClient() : this.redisdb.duplicate();
-          this.mcDirectMessageChannelClient.subscribe(`${mcMessageKey}:${serviceName}:${this.instanceID}`);
+          this.mcDirectMessageChannelClient = this.redisdb.duplicate();
+          // 必须要await, 不然shutdown可能报Connection closed
+          await this.mcDirectMessageChannelClient.subscribe(`${mcMessageKey}:${serviceName}:${this.instanceID}`);
           this.mcDirectMessageChannelClient.on('message', (channel, message) => {
             let msg = Utils.safeJSONParse(message);
             if (msg) {
@@ -561,7 +581,7 @@ class Hydra extends EventEmitter {
           this.healthTimerInterval = setInterval(this._updateHealthCheck, HEALTH_UPDATE_INTERVAL);
 
           // Update presence immediately without waiting for next update interval.
-          this._updatePresence();
+          await this._updatePresence();
 
           resolve({
             serviceName: this.serviceName,
@@ -754,8 +774,8 @@ class Hydra extends EventEmitter {
       hostName: this.hostName
     });
     if (entry && !this.redisdb.closing) {
-      let cmd = (this.testMode) ? 'multi' : 'batch';
-      this.redisdb[cmd]()
+      let cmd = Utils.getBatchOrPipeline(this.redisdb);
+      return this.redisdb[cmd]()
         .setex(`${redisPreKey}:${this.serviceName}:${this.instanceID}:presence`, KEY_EXPIRATION_TTL, this.instanceID)
         .hset(`${redisPreKey}:nodes`, this.instanceID, entry)
         .exec();
@@ -772,7 +792,7 @@ class Hydra extends EventEmitter {
     let entry = Object.assign({
       updatedOn: this._getTimeStamp()
     }, this._getHealth());
-    let cmd = (this.testMode) ? 'multi' : 'batch';
+    let cmd = Utils.getBatchOrPipeline(this.redisdb);
     this.redisdb[cmd]()
       .setex(`${redisPreKey}:${this.serviceName}:${this.instanceID}:health`, KEY_EXPIRATION_TTL, Utils.safeJSONStringify(entry))
       .expire(`${redisPreKey}:${this.serviceName}:${this.instanceID}:health:log`, ONE_WEEK_IN_SECONDS)
@@ -882,7 +902,7 @@ class Hydra extends EventEmitter {
             if (err) {
               reject(err);
             } else {
-              let serviceList = result.map((service) => {
+              let serviceList = Utils.ioToRedisMultiAdapter(result).map((service) => {
                 return Utils.safeJSONParse(service);
               });
               resolve(serviceList);
@@ -992,7 +1012,7 @@ class Hydra extends EventEmitter {
               reject(err);
             } else {
               let instanceList = [];
-              result.forEach((instance) => {
+              Utils.ioToRedisMultiAdapter(result).forEach((instance) => {
                 if (instance) {
                   let instanceObj = Utils.safeJSONParse(instance);
                   if (instanceObj) {
@@ -1077,7 +1097,7 @@ class Hydra extends EventEmitter {
             if (err) {
               reject(err);
             } else {
-              let instanceList = result.map((instance) => {
+              let instanceList = Utils.ioToRedisMultiAdapter(result).map((instance) => {
                 return Utils.safeJSONParse(instance);
               });
               this.internalCache.put(cacheKey, instanceList, KEY_EXPIRATION_TTL);
@@ -1139,6 +1159,7 @@ class Hydra extends EventEmitter {
             } else {
               let response = [];
               if (result && result.length > 0) {
+                result = Utils.ioToRedisMultiAdapter(result);
                 result = result[0];
                 result.forEach((entry) => {
                   response.push(Utils.safeJSONParse(entry));
@@ -1919,12 +1940,10 @@ class IHydra extends Hydra {
    * @summary Initialize Hydra with config object.
    * @param {mixed} config - a string with a path to a configuration file or an
    *                         object containing hydra specific keys/values
-   * @param {boolean} testMode - whether hydra is being started in unit test mode
    * @return {object} promise - resolving if init success or rejecting otherwise
    */
-  init(config, testMode = false) {
-    testMode = false;
-    return super.init(config, testMode);
+  init(config) {
+    return super.init(config);
   }
 
   /**

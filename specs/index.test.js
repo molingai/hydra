@@ -52,6 +52,7 @@ describe('Hydra Main', function() {
 
   afterEach((done) => {
     hydra.shutdown().then(() => {
+      // console.log('shutdown!')
       let name = require.resolve('../index.js');
       delete require.cache[name];
       done();
@@ -169,24 +170,22 @@ describe('Hydra Main', function() {
   */
   it('should be able to register as a service', (done) => {
     hydra.init(getConfig(), true)
-      .then(() => {
-        hydra.redisdb.flushdb((err) => {
-          expect(err).to.be.null;
-          hydra.registerService()
-            .then((_serviceInfo) => {
-              setTimeout(() => {
-                hydra.redisdb.keys('*', (err, data) => {
-                  console.log(getConfig(), _serviceInfo, data);
-                  expect(err).to.be.null;
-                  expect(data.length).to.equal(3);
-                  expect(data).to.include('hydra:service:test-service:service');
-                  expect(data).to.include('hydra:service:nodes');
-                  done();
-                });
-                hydra.redisdb.quit();
-              }, SECOND);
-            });
-        });
+      .then(async() => {
+        await hydra.redisdb.flushdb();
+        hydra.registerService()
+          .then((_serviceInfo) => {
+            setTimeout(() => {
+              hydra.redisdb.keys('*', (err, data) => {
+                console.log(getConfig(), _serviceInfo, data);
+                expect(err).to.be.null;
+                expect(data.length).to.equal(3);
+                expect(data).to.include('hydra:service:test-service:service');
+                expect(data).to.include('hydra:service:nodes');
+                done();
+              });
+              // hydra.redisdb.quit(); // afterEach 会shutdown
+            }, SECOND);
+          });
       });
   });
 
@@ -195,9 +194,11 @@ describe('Hydra Main', function() {
   */
   it('should have a serviceName, serviceIP, servicePort and instanceID', (done) => {
     hydra.init(getConfig(), true)
-      .then(() => {
+      .then(async() => {
+        await hydra.redisdb.flushdb();
         hydra.registerService()
           .then((serviceInfo) => {
+            console.log('serviceInfo1', serviceInfo);
             expect(serviceInfo).not.null;
             expect(serviceInfo.serviceName).to.equal('test-service');
             expect(serviceInfo.serviceIP).to.equal('127.0.0.1');
@@ -212,9 +213,11 @@ describe('Hydra Main', function() {
   */
   it('should see that getServiceName returns name of service', (done) => {
     hydra.init(getConfig(), true)
-      .then(() => {
+      .then(async() => {
+        await hydra.redisdb.flushdb();
         hydra.registerService()
           .then((serviceInfo) => {
+            console.log('serviceInfo2', serviceInfo);
             expect(serviceInfo).not.null;
             expect(serviceInfo.serviceName).to.equal('test-service');
             expect(hydra.getServiceName()).to.equal(serviceInfo.serviceName);
@@ -228,7 +231,8 @@ describe('Hydra Main', function() {
   */
   it('should see that getServices returns list of services', (done) => {
     hydra.init(getConfig(), true)
-      .then(() => {
+      .then(async() => {
+        await hydra.redisdb.flushdb();
         hydra.registerService()
           .then((_serviceInfo) => {
             hydra.getServices()
@@ -248,7 +252,8 @@ describe('Hydra Main', function() {
   */
   it('should see that getServiceNodes returns list of service nodes', (done) => {
     hydra.init(getConfig(), true)
-      .then(() => {
+      .then(async() => {
+        await hydra.redisdb.flushdb();
         hydra.registerService()
           .then((_serviceInfo) => {
             hydra.getServiceNodes()
@@ -269,31 +274,28 @@ describe('Hydra Main', function() {
   */
   it('should update presence', (done) => {
     hydra.init(getConfig(), true)
-      .then(() => {
-        // let r = redis.createClient();
-        hydra.redisdb.flushdb((err) => {
-          expect(err).to.be.null;
-          hydra.registerService()
-            .then((_serviceInfo) => {
-              let instanceID = hydra.getInstanceID();
-              hydra.redisdb.hget('hydra:service:nodes', instanceID, (err, data) => {
-                expect(err).to.be.null;
-                expect(data).to.not.be.null;
+      .then(async() => {
+        await hydra.redisdb.flushdb();
+        hydra.registerService()
+          .then((_serviceInfo) => {
+            let instanceID = hydra.getInstanceID();
+            hydra.redisdb.hget('hydra:service:nodes', instanceID, (err, data) => {
+              expect(err).to.be.null;
+              expect(data).to.not.be.null;
 
-                let entry = JSON.parse(data);
-                setTimeout(() => {
-                  hydra.redisdb.hget('hydra:service:nodes', instanceID, (err, data) => {
-                    expect(err).to.be.null;
-                    expect(data).to.not.be.null;
-                    let entry2 = JSON.parse(data);
-                    expect(entry2.updatedOn).to.not.equal(entry.updatedOn);
-                    hydra.redisdb.quit();
-                    done();
-                  });
-                }, SECOND);
-              });
+              let entry = JSON.parse(data);
+              setTimeout(() => {
+                hydra.redisdb.hget('hydra:service:nodes', instanceID, (err, data) => {
+                  expect(err).to.be.null;
+                  expect(data).to.not.be.null;
+                  let entry2 = JSON.parse(data);
+                  expect(entry2.updatedOn).to.not.equal(entry.updatedOn);
+                  // hydra.redisdb.quit(); // afterEach 会shutdown
+                  done();
+                });
+              }, SECOND);
             });
-        });
+          });
       });
   });
 
@@ -302,15 +304,16 @@ describe('Hydra Main', function() {
   */
   it('should expire redis keys on shutdown', (done) => {
     hydra.init(getConfig(), true)
-      .then(() => {
+      .then(async() => {
         // let r = redis.createClient();
+        await hydra.redisdb.flushdb();
         hydra.registerService()
           .then((_serviceInfo) => {
             setTimeout(() => {
               hydra.redisdb.get('hydra:service:test-service:73909f8c96a9d08e876411c0a212a1f4:presence', (err, _data) => {
                 expect(err).to.be.null;
                 done();
-                hydra.redisdb.quit();
+                // hydra.redisdb.quit(); // afterEach 会shutdown
               });
             }, SECOND * 5);
           });
@@ -322,7 +325,8 @@ describe('Hydra Main', function() {
   */
   it('should be able to discover a service', (done) => {
     hydra.init(getConfig(), true)
-      .then(() => {
+      .then(async() => {
+        await hydra.redisdb.flushdb();
         hydra.registerService()
           .then((_serviceInfo) => {
             setTimeout(() => {
@@ -343,7 +347,8 @@ describe('Hydra Main', function() {
   */
   it('should return an error if a service doesn\'t exists', (done) => {
     hydra.init(getConfig(), true)
-      .then(() => {
+      .then(async() => {
+        await hydra.redisdb.flushdb();
         hydra.registerService()
           .then((_serviceInfo) => {
             setTimeout(() => {
@@ -367,7 +372,8 @@ describe('Hydra Main', function() {
   */
   it('should be able to retrieve service presence', (done) => {
     hydra.init(getConfig(), true)
-      .then(() => {
+      .then(async() => {
+        await hydra.redisdb.flushdb();
         hydra.registerService()
           .then((_serviceInfo) => {
             hydra.getServicePresence('test-service')
