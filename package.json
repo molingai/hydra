@@ -26,7 +26,6 @@
     "url": "git+https://github.com/pnxtech/hydra.git"
   },
   "dependencies": {
-    "bluebird": "3.5.1",
     "debug": "2.6.9",
     "ioredis": "^5.0.4",
     "redis-url": "1.2.1",
