@@ -2313,18 +2313,31 @@ class IHydra extends Hydra {
   }
   }
   */
+
+  /**
+  * @name _splitBdyFromMsg
+  * @summary _splitBdyFromMsg
+  * @param {object} msg - 收到的消息
+  * @return {object} 将bdy放在顶级
+  */
   _splitBdyFromMsg(msg) {
-    const bdy = Object.assign({}, msg.bdy)
+    const bdy = Object.assign({}, msg.bdy);
     // delete msg.bdy
-    bdy.rawMsg = msg
-    return bdy
+    bdy.rawMsg = msg;
+    return bdy;
   }
 
+  /**
+  * @name proxyMessage
+  * @summary 代理消息
+  * @param {function} callback - 消息回调
+  * @return {void}
+  */
   proxyMessage(callback) {
-    this._resolves = {}
+    this._resolves = {};
     // 其它服务发消息给我
     this.on('message', (msg) => {
-        /*
+      /*
         {
         "to":"3a5c26ac01b2441b942c224655cd7aef@service1:/",
         "frm":"service2:/",
@@ -2335,69 +2348,88 @@ class IHydra extends Hydra {
         "bdy":{"name":"i got it"}
         }
         */
-        if (msg.rmid) {
-            // console.log('receive reply msg', msg)
-            if (this._resolves[msg.rmid]) {
-                const bdy = this._splitBdyFromMsg(msg)
-                this._resolves[msg.rmid](bdy)
-                delete this._resolves[msg.rmid]
-            } else {
-                // 可能过时了, 不要管
-            }
-            return
+      if (msg.rmid) {
+        // console.log('receive reply msg', msg)
+        if (this._resolves[msg.rmid]) {
+          const bdy = this._splitBdyFromMsg(msg);
+          this._resolves[msg.rmid](bdy);
+          delete this._resolves[msg.rmid];
+        } else {
+          // 可能过时了, 不要管
         }
-        // 不是回复的消息, 是请求的消息
-        else {
-            // console.log('receive msg', msg)
-            callback(msg.typ, msg.bdy, msg)
-        }
-    })
+        return;
+      }
+      // 不是回复的消息, 是请求的消息
+      // console.log('receive msg', msg)
+      callback(msg.typ, msg.bdy, msg);
+    });
   }
 
-  // 调接口
+  /**
+  * @name call
+  * @summary 一问一答
+  * @param {string} method - 方法
+  * @param {object} bdy - 消息
+  * @param {string} toServiceName - toServiceName
+  * @param {string} toInstanceId - toInstanceId
+  * @return {void}
+  */
   async call(method, bdy, toServiceName, toInstanceId) {
-    let msg = await this.send(method, bdy, toServiceName, toInstanceId)
+    let msg = await this.send(method, bdy, toServiceName, toInstanceId);
     // console.log('this.config.timeout', this.config.timeout)
     // console.log('ret', ret)
     return new Promise((resolve, reject) => {
-        this._resolves[msg.mid] = resolve
-        // 过时就reject
-        setTimeout(() => {
-            if (this._resolves[msg.mid]) {
-                delete this._resolves[msg.mid]
-                // console.error('timeout', msg)
-                reject(new Error('timeout'))
-            }
-        }, this.config.timeout || 5000)
-    })
+      this._resolves[msg.mid] = resolve;
+      // 过时就reject
+      setTimeout(() => {
+        if (this._resolves[msg.mid]) {
+          delete this._resolves[msg.mid];
+          // console.error('timeout', msg)
+          reject(new Error('timeout'));
+        }
+      }, this.config.timeout || 5000);
+    });
   }
 
-  // 仅发送
+  /**
+  * @name send
+  * @summary 仅发送
+  * @param {string} method - 方法
+  * @param {object} bdy - 消息
+  * @param {string} toServiceName - toServiceName
+  * @param {string} toInstanceId - toInstanceId
+  * @return {void}
+  */
   async send(method, bdy, toServiceName, toInstanceId) {
-    let to = `${toServiceName}:/`
+    let to = `${toServiceName}:/`;
     if (toInstanceId) {
-        to = `${toInstanceId}@${to}`
+      to = `${toInstanceId}@${to}`;
     }
-    const frm = `${this.getInstanceID()}@${this.getServiceName()}:/`
+    const frm = `${this.getInstanceID()}@${this.getServiceName()}:/`;
     let msg = this.createUMFMessage({
-        typ: method,
-        to,
-        frm,
-        bdy
+      typ: method,
+      to,
+      frm,
+      bdy
     });
     // let shortMsg = msg.toShort()
     // console.log('send msg', shortMsg)
-    await this.sendMessage(msg)
-    return msg
+    await this.sendMessage(msg);
+    return msg;
   }
 
-  // 回复
+  /**
+  * @name reply
+  * @summary 回复
+  * @param {object} bdy - 消息
+  * @param {object} preMsg - 之前收到的消息
+  * @return {void}
+  */
   async reply(bdy, preMsg) {
     return this.sendReplyMessage(preMsg, this.createUMFMessage({
       bdy
-    }))
+    }));
   }
-
 }
 
 module.exports = IHydra; // new IHydra

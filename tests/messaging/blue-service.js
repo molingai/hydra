@@ -24,7 +24,7 @@ hydra.init(config.hydra)
     hydra.registerService()
       .then((serviceInfo) => {
         console.log(`Running ${serviceInfo.serviceName} at ${serviceInfo.serviceIP}:${serviceInfo.servicePort}`);
-        hydra.on('message', (message) => {
+        hydra.on('message', (msg) => {
           console.log(`Received object message: ${msg.mid}: ${JSON.stringify(msg)}`);
         });
         setInterval(() => {

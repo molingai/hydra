@@ -17,7 +17,9 @@
   },
   "scripts": {
     "test": "mocha specs --reporter spec",
-    "coverage": "nyc --reporter=text ./node_modules/mocha/bin/_mocha specs --reporter spec"
+    "coverage": "nyc --reporter=text ./node_modules/mocha/bin/_mocha specs --reporter spec",
+    "lint": "eslint .",
+    "lintfix": "eslint --fix ."
   },
   "repository": {
     "type": "git",

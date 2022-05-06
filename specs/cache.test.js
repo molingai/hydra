@@ -3,7 +3,7 @@
 require('./helpers/chai.js');
 
 const Cache = require('../lib/cache');
-const version = require('../package.json').version;
+// const version = require('../package.json').version;
 const SECOND = 1000;
 
 let cache;
@@ -38,9 +38,9 @@ describe('Cache', function() {
   * @description Confirms that cache will return undefined if not cached
   */
   it('should return undefined if not cached before', (done) => {
-   let val = cache.get('NO_SUCH_KEY');
-   expect(val).to.be.undefined;
-   done();
+    let val = cache.get('NO_SUCH_KEY');
+    expect(val).to.be.undefined;
+    done();
   });
 
   /**

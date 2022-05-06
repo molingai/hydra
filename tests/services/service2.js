@@ -1,5 +1,5 @@
-const Hydra = require('../../index')
-const hydra = new Hydra()
+const Hydra = require('../../index');
+const hydra = new Hydra();
 const config = {
   hydra: {
     serviceName: 'service2',
@@ -9,10 +9,10 @@ const config = {
       db: 15
     }
   }
-}
+};
 
-hydra.init(config).then(async () => {
-  let ret = await hydra.registerService()
+hydra.init(config).then(async() => {
+  let ret = await hydra.registerService();
   /*
     {
       serviceName: 'service_1',
@@ -20,8 +20,8 @@ hydra.init(config).then(async () => {
       servicePort: 46738
     }
   */
-  console.log('registerService success', ret)
-  
+  console.log('registerService success', ret);
+
   hydra.on('message', function(msg) {
     // sometimes lost service2's reply message
     console.log(`Received object message: ${msg.mid}: ${JSON.stringify(msg)}`);
@@ -31,8 +31,8 @@ hydra.init(config).then(async () => {
         name: 'i got it'
       }
     })).then(() => {
-      console.log('reply ok')
-    })
+      console.log('reply ok');
+    });
     let message1 = hydra.createUMFMessage({
       to: msg.frm, // 'service_1:/',
       from: 'service2:/',
@@ -41,8 +41,7 @@ hydra.init(config).then(async () => {
       }
     });
     hydra.sendMessage(message1).catch((e) => {
-      console.error(e)
-    })
-  })
-
-})
+      console.error(e);
+    });
+  });
+});

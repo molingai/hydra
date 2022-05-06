@@ -46,7 +46,7 @@ describe('Hydra Main', function() {
 
   beforeEach(() => {
     const Hydra = require('../index.js');
-    hydra = new Hydra()
+    hydra = new Hydra();
     redis.removeAllListeners('message');
   });
 
@@ -83,7 +83,7 @@ describe('Hydra Main', function() {
             done();
           })
           .catch((err) => {
-              // console.log(err)
+            // console.log(err)
             expect(err).to.not.be.null;
             expect(err.message).to.equal('Hydra.init() already invoked');
             done();

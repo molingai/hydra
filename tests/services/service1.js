@@ -1,5 +1,5 @@
-const Hydra = require('../../index')
-const hydra = new Hydra()
+const Hydra = require('../../index');
+const hydra = new Hydra();
 const config = {
   hydra: {
     serviceName: 'service1',
@@ -9,10 +9,10 @@ const config = {
       db: 15
     }
   }
-}
+};
 
-hydra.init(config).then(async () => {
-  let ret = await hydra.registerService()
+hydra.init(config).then(async() => {
+  let ret = await hydra.registerService();
   /*
     {
       serviceName: 'service_1',
@@ -20,12 +20,12 @@ hydra.init(config).then(async () => {
       servicePort: 46738
     }
   */
-  console.log('registerService success', ret)
-  console.log('hydra.getInstanceID()', hydra.getInstanceID())
+  console.log('registerService success', ret);
+  console.log('hydra.getInstanceID()', hydra.getInstanceID());
   hydra.on('message', function(msg) {
     // sometimes lost service2's reply message
     console.log(`Received object message: ${msg.mid}: ${JSON.stringify(msg)}`);
-  })
+  });
   // 使用 sendMessage 时，会将消息发送到随机选择的可用服务实例
   let message1 = hydra.createUMFMessage({
     to: 'service2:/',
@@ -34,12 +34,11 @@ hydra.init(config).then(async () => {
       name: 'hello ' + new Date()
     }
   });
-  console.log('send msg', message1)
+  console.log('send msg', message1);
   hydra.sendMessage(message1).catch((e) => {
-    console.error(e)
-  })
-
-})
+    console.error(e);
+  });
+});
 
 const config2 = {
   hydra: {
@@ -50,10 +49,10 @@ const config2 = {
       db: 15
     }
   }
-}
-const hydra2 = new Hydra()
-hydra2.init(config2).then(async () => {
-  let ret = await hydra2.registerService()
+};
+const hydra2 = new Hydra();
+hydra2.init(config2).then(async() => {
+  let ret = await hydra2.registerService();
   /*
     {
       serviceName: 'service_1',
@@ -61,12 +60,12 @@ hydra2.init(config2).then(async () => {
       servicePort: 46738
     }
   */
-  console.log('registerService success', ret)
-  console.log('hydra.getInstanceID()', hydra2.getInstanceID())
+  console.log('registerService success', ret);
+  console.log('hydra.getInstanceID()', hydra2.getInstanceID());
   hydra2.on('message', function(msg) {
     // sometimes lost service2's reply message
     console.log(`Received object message: ${msg.mid}: ${JSON.stringify(msg)}`);
-  })
+  });
   // 使用 sendMessage 时，会将消息发送到随机选择的可用服务实例
   let message1 = hydra2.createUMFMessage({
     to: 'service2:/',
@@ -75,9 +74,8 @@ hydra2.init(config2).then(async () => {
       name: 'hello ' + new Date()
     }
   });
-  console.log('send msg', message1)
+  console.log('send msg', message1);
   hydra2.sendMessage(message1).catch((e) => {
-    console.error(e)
-  })
-
-})
+    console.error(e);
+  });
+});

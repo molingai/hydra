@@ -2,7 +2,7 @@
   "plugins": ["mocha"],
   "extends": ["eslint:recommended", "google"],
   "parserOptions": {
-    "ecmaVersion": 6,
+    "ecmaVersion": 9,
     "ecmaFeatures": {
       "jsx": true
     },
