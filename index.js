@@ -80,11 +80,11 @@ class Hydra extends EventEmitter {
    * @return {object} - Promise which will resolve when all plugins are registered
    */
   async use(...plugins) {
-      let rets = []
-      for (let plugin of plugins) {
-          rets.push(await this._registerPlugin(plugin))
-      }
-      return rets
+    let rets = [];
+    for (let plugin of plugins) {
+      rets.push(await this._registerPlugin(plugin));
+    }
+    return rets;
     // return Promise.series(plugins, (plugin) => this._registerPlugin(plugin));
   }
 
@@ -122,21 +122,20 @@ class Hydra extends EventEmitter {
     }
 
     const initPromise = new Promise((resolve, reject) => {
-      let loader = async (newConfig) => {
-
-          try {
-              let _results = []
-              for (let plugin of this.registeredPlugins) {
-                  _results.push(await plugin.setConfig(newConfig.hydra))
-              }
-              await this._init(newConfig.hydra)
-              return resolve(newConfig)
-          } catch(err) {
-              this._logMessage('error', err.toString());
-                reject(err);
+      let loader = async(newConfig) => {
+        try {
+          let _results = [];
+          for (let plugin of this.registeredPlugins) {
+            _results.push(await plugin.setConfig(newConfig.hydra));
           }
+          await this._init(newConfig.hydra);
+          return resolve(newConfig);
+        } catch (err) {
+          this._logMessage('error', err.toString());
+          reject(err);
+        }
 
-          /*
+        /*
         return Promise.series(this.registeredPlugins, (plugin) => plugin.setConfig(newConfig.hydra))
           .then((..._results) => {
             return this._init(newConfig.hydra);
@@ -261,16 +260,16 @@ class Hydra extends EventEmitter {
   _init(config) {
     // console.log('config', config)
     return new Promise((resolve, reject) => {
-      let ready = async () => {
-          try {
-              for (let plugin of this.registeredPlugins) {
-                  await plugin.onServiceReady()
-              }
-              resolve();
-          } catch(err) {
-              this._logMessage('error', err.toString());
-              reject(err);
+      let ready = async() => {
+        try {
+          for (let plugin of this.registeredPlugins) {
+            await plugin.onServiceReady();
           }
+          resolve();
+        } catch (err) {
+          this._logMessage('error', err.toString());
+          reject(err);
+        }
         // Promise.series(this.registeredPlugins, (plugin) => plugin.onServiceReady()).then((..._results) => {
         //   resolve();
         // }).catch((err) => {

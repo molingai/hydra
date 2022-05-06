@@ -6,17 +6,17 @@ async function test() {
   });
   db.set('life', 'you');
   db.get('life', (err, ret) => {
-      console.log('get', ret) // you
+    console.log('get', ret); // you
   });
   db.lpush('x', 1, (err, ret) => {
-      console.log('lpush', ret) // 95
+    console.log('lpush', ret); // 95
   });
   db.select(0, (err, ret) => {
-      console.log('select', ret) // OK
+    console.log('select', ret); // OK
   });
   // [ 'OK', 96, you ]
   db.multi().select(0).lpush('x', 1).get('life').exec((err, ret) => {
-      console.log(ret);
+    console.log(ret);
   });
 }
 test();

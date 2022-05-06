@@ -20,7 +20,7 @@ async function test() {
   console.log(await db.multi().set('key1', 'xx').incr('life').exec());
   console.log(await db.get('key1'), await db.get('life'));
 
-  console.log('------pipeline-----')
+  console.log('------pipeline-----');
   // [ [ null, 'xx' ], [ null, 'you' ] ]
   console.log(await db.pipeline().get('key1').get('life').exec());
 
