@@ -2454,4 +2454,7 @@ class IHydra extends Hydra {
   }
 }
 
-module.exports = IHydra; // new IHydra
+const me = new IHydra()
+me.Hydra = IHydra
+
+module.exports = me; // new IHydra

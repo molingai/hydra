@@ -173,7 +173,7 @@ export type Presence = {
   updatedOnTS: number // 1651054825289
 }
 
-export default class Hydra extends EventEmitter {
+export class Hydra extends EventEmitter {
   /**
    * @name init
    * @summary Initialize Hydra with config object.
