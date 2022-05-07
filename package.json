@@ -1,9 +1,9 @@
 {
   "name": "hydra",
-  "version": "2.0.0",
+  "version": "1.10.1",
   "license": "MIT",
-  "author": "Carlos Justiniano",
-  "contributors": "https://github.com/pnxtech/hydra/graphs/contributors",
+  "author": "Carlos Justiniano; life",
+  "contributors": "https://github.com/molingai/hydra/graphs/contributors",
   "description": "Hydra is a NodeJS light-weight library for building distributed computing applications such as microservices",
   "keywords": [
     "hydra",
@@ -23,7 +23,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pnxtech/hydra.git"
+    "url": "git+https://github.com/molingai/hydra.git"
   },
   "dependencies": {
     "debug": "2.6.9",
@@ -51,7 +51,7 @@
     "hydra": "index.js"
   },
   "bugs": {
-    "url": "https://github.com/pnxtech/hydra/issues"
+    "url": "https://github.com/molingai/hydra/issues"
   },
-  "homepage": "https://github.com/pnxtech/hydra#readme"
+  "homepage": "https://github.com/molingai/hydra#readme"
 }
