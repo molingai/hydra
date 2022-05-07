@@ -1,5 +1,3 @@
-'use strict';
-
 const debug = require('debug')('hydra');
 
 // const Promise = require('bluebird');
@@ -401,6 +399,7 @@ class Hydra extends EventEmitter {
         promises.push(this.publishChannel.quit());
       }
 
+      // 立即删除presence
       promises.push(this.redisdb.del(`${redisPreKey}:${this.serviceName}:${this.instanceID}:presence`));
       await Promise.all(promises);
       await this.redisdb.quit();
@@ -552,6 +551,9 @@ class Hydra extends EventEmitter {
           //   redisConnection = new RedisConnection(this.config.redis, 0, this.testMode);
           //   testRedis = redisConnection.getRedis();
           // }
+
+          // 以下两个client可以合并为一个, 两次subscribe即可
+
           // Setup service message courier channels
           this.mcMessageChannelClient = this.redisdb.duplicate();
           // 必须要await, 不然shutdown可能报Connection closed
@@ -1419,6 +1421,7 @@ class Hydra extends EventEmitter {
             resolve(this._createServerResponseWithReason(ServerResponse.HTTP_SERVICE_UNAVAILABLE, msg));
             return;
           }
+          // 发给特定的instance
           // Did the user specify a specific service instance to use?
           if (instance && instance !== '') {
             // Make sure supplied instance actually exists in the array
