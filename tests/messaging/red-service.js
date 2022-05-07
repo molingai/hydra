@@ -15,7 +15,7 @@ const config = {
   }
 };
 
-const hydra =  new Hydra()
+const hydra = new Hydra();
 hydra.init(config)
   .then(() => {
     hydra.registerService()

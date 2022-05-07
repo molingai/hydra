@@ -140,10 +140,10 @@ export type Service = {
    */
   registeredOn: String
 
-   /**
+  /**
    *  from config.serviceType
    */
-    type?: string,
+  type?: string,
 }
 
 export type Presence = {
@@ -218,16 +218,16 @@ export class Hydra extends EventEmitter {
   sendReplyMessage(originalMessage: Message, messageResponse: UMFMessage): Promise<void>
 
   /**
-  * @name ready
-  * @summary returns promise that resolves when initialization is complete
-  * @return {object} promise - resolving if init success or rejecting otherwise
-  */
+   * @name ready
+   * @summary returns promise that resolves when initialization is complete
+   * @return {object} promise - resolving if init success or rejecting otherwise
+   */
   ready(): Promise<void>
 
   /**
-  * @name _shutdown
-  * @summary Shutdown hydra safely.
-  */
+   * @name _shutdown
+   * @summary Shutdown hydra safely.
+   */
   shutdown(): Promise
 
   /**
@@ -283,14 +283,14 @@ export class Hydra extends EventEmitter {
    *              service is running in at least one node.
    * @param {string} name - service name - note service name is case insensitive
    * @return {promise} promise - which resolves with TRUE if presence is found, FALSE otherwise
-  */
+   */
   hasServicePresence(name): Promise<boolean>
 
   /**
-  * @name getInstanceID
-  * @summary Return the instance id for this process
-  * @return {number} id - instanceID
-  */
+   * @name getInstanceID
+   * @summary Return the instance id for this process
+   * @return {number} id - instanceID
+   */
   getInstanceID(): string
 
   getInstanceVersion(): string
@@ -314,3 +314,6 @@ export class Hydra extends EventEmitter {
   reply (bdy: any, preMsg: Message): Promise<void>
   send (method: string, bdy: any, toServiceName: string, toInstanceId?: string): Promise<UMFMessage>
 }
+
+let hydra: Hydra
+export default hydra

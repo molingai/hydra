@@ -17,7 +17,7 @@ const config = {
 
 let count = 0;
 
-const hydra =  new Hydra()
+const hydra = new Hydra();
 hydra.init(config)
   .then(() => {
     hydra.registerService()
