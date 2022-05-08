@@ -2049,12 +2049,17 @@ class Hydra extends EventEmitter {
         await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, err: msg}));
         return;
       }
-      const data = await handler.apply(handler, args);
-      // log(data)
-      // 将结果发到channel 为 rcp-ret:instanceId
-      // let publishRet = await this.redisdb.publish('rpc-ret:' + instanceId, JSON.stringify({ id, data: data }));
-      let publishRet = await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, data: data}));
-      log('publish ret', publishRet);
+      try {
+        const data = await handler.apply(handler, args);
+        // log(data)
+        // 将结果发到channel 为 rcp-ret:instanceId
+        // let publishRet = await this.redisdb.publish('rpc-ret:' + instanceId, JSON.stringify({ id, data: data }));
+        let publishRet = await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, data: data}));
+        log('publish ret', publishRet);
+      } catch (err) {
+        this._logMessage('error', err);
+        await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, err: err.message || err}));
+      }
     });
     // 监听别人的调用, 如果这里没有成功, 别人publish会返回0
     // sub.subscribe(`rpc:${this.instanceId}`);
