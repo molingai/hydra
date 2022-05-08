@@ -2055,12 +2055,13 @@ class Hydra extends EventEmitter {
         // 将结果发到channel 为 rcp-ret:instanceId
         // let publishRet = await this.redisdb.publish('rpc-ret:' + instanceId, JSON.stringify({ id, data: data }));
         if (!noRet) {
-            let publishRet = await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, data: data}));
-            log('publish ret', publishRet);
+          let publishRet = await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, data: data}));
+          log('publish ret', publishRet);
         }
       } catch (err) {
         this._logMessage('error', err);
-        !noRet && await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, err: err.message || err}));
+        let ret = JSON.stringify({id, err: err.message || err});
+        !noRet && await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, ret);
       }
     });
     // 监听别人的调用, 如果这里没有成功, 别人publish会返回0
@@ -2092,7 +2093,7 @@ class Hydra extends EventEmitter {
       log('initRPCCallRetMessage error', error);
     });
     sub.on('message', (channel, message) => {
-      // log('get ret message', message)
+      // console.log('get ret message', message)
       const ret = JSON.parse(message);
       const resolveAndReject = this._callResolveM[ret.id];
       if (resolveAndReject) {
@@ -2100,7 +2101,7 @@ class Hydra extends EventEmitter {
         if (!ret.err) {
           resolve(ret.data);
         } else {
-          reject(ret.err);
+          reject(new Error(ret.err));
         }
         delete this._callResolveM[ret.id];
         clearTimeout(this._callTimerM[ret.id]);
@@ -2190,7 +2191,7 @@ class Hydra extends EventEmitter {
 
     // 不需要回复, 则直接返回
     if (noNeedRet) {
-        return await this._publishUntilSuccess(this.redisdb, `hydra:rpc-call:${instanceID}`, JSON.stringify({id, frm: this.instanceID, noRet: true, funcName, args}));
+      return await this._publishUntilSuccess(this.redisdb, `hydra:rpc-call:${instanceID}`, JSON.stringify({id, frm: this.instanceID, noRet: true, funcName, args}));
     }
 
     const result = new Promise((resolve, reject) => {

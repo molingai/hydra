@@ -46,7 +46,12 @@ async function registerServiceBlue() {
     async longFunc(name) {
       await Hydra.getUtilsHelper().sleep(SECOND * 6);
       return 'pong' + name;
+    },
+
+    error () {
+        throw new Error('这是一个错误')
     }
+
   });
   return blue;
 }
@@ -65,6 +70,9 @@ async function test() {
 
   console.log('no need ret', await client.rpcSend('blue.getInstanceID'))
   console.log('no need ret', await client.rpcSend('blue.log', 'me'))
+
+  console.log('throw a error')
+  await client.rpcCall('blue.error')
 
   let to = await client.rpcCall('blue.getInstanceID');
   console.log('getInstanceID-------', to, await client.rpcCall(to + '@blue.getInstanceID'));
