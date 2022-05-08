@@ -321,11 +321,18 @@ export class Hydra extends EventEmitter {
   // RPC
 
   /**
-   * 调用方法
+   * 调用方法, 需要回复
    * @param methodName [instanceId@]serviceName.functionName 如 service1.ping, instanceId@service1.ping
    * @param args
    */
   rpcCall(methodName: string, ...args: any[]): Promise<any>
+
+  /**
+   * 调用方法, 不需要回复, 返回true表示发送成功
+   * @param methodName [instanceId@]serviceName.functionName 如 service1.ping, instanceId@service1.ping
+   * @param args
+   */
+  rpcSend(methodName: string, ...args: any[]): Promise<boolean>
 
   /**
    * 添加多个

@@ -2040,13 +2040,13 @@ class Hydra extends EventEmitter {
     // 收到别人的调用, 处理, 并将结果发到channel中
     sub.on('message', async(channel, message) => {
       log('get call message', message);
-      const {id, frm, funcName, args} = JSON.parse(message);
+      const {id, frm, noRet, funcName, args} = JSON.parse(message);
       const handler = this._rpcHandlers[funcName];
       if (!handler) {
         let msg = `No ${funcName} on ${this.serviceName}`;
         this._logMessage('error', msg);
         // throw new Error(msg);
-        await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, err: msg}));
+        !noRet && await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, err: msg}));
         return;
       }
       try {
@@ -2054,11 +2054,13 @@ class Hydra extends EventEmitter {
         // log(data)
         // 将结果发到channel 为 rcp-ret:instanceId
         // let publishRet = await this.redisdb.publish('rpc-ret:' + instanceId, JSON.stringify({ id, data: data }));
-        let publishRet = await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, data: data}));
-        log('publish ret', publishRet);
+        if (!noRet) {
+            let publishRet = await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, data: data}));
+            log('publish ret', publishRet);
+        }
       } catch (err) {
         this._logMessage('error', err);
-        await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, err: err.message || err}));
+        !noRet && await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, err: err.message || err}));
       }
     });
     // 监听别人的调用, 如果这里没有成功, 别人publish会返回0
@@ -2155,10 +2157,11 @@ class Hydra extends EventEmitter {
    *   call('server1.ping', 'life')
    *   call('instanceId@server1.ping', 'life')
    * @param {string} methodName -
+   * @param {boolean} noNeedRet - true不需要回复, false 需要回复
    * @param {array} args -
    * @return {object} -
    */
-  async _rpcCall(methodName, ...args) {
+  async _rpcCall(methodName, noNeedRet, ...args) {
     const id = uuid.v4();
     // const serviceName = await this.redisdb.hget(rpcMethodKey, methodName);
     let {
@@ -2183,6 +2186,11 @@ class Hydra extends EventEmitter {
       }
     } else {
       instanceID = instances[0].instanceID;
+    }
+
+    // 不需要回复, 则直接返回
+    if (noNeedRet) {
+        return await this._publishUntilSuccess(this.redisdb, `hydra:rpc-call:${instanceID}`, JSON.stringify({id, frm: this.instanceID, noRet: true, funcName, args}));
     }
 
     const result = new Promise((resolve, reject) => {
@@ -2742,7 +2750,7 @@ class IHydra extends Hydra {
 
   /**
    * @name rpcCall
-   * @summary 调用 rpc method
+   * @summary 调用 rpc method, 需要回复
    *   methodName = '[instanceId@]serviceName.ping'
    *   call('server1.ping', 'life')
    *   call('instanceId@server1.ping', 'life')
@@ -2751,7 +2759,21 @@ class IHydra extends Hydra {
    * @return {object} -
    */
   rpcCall(methodName, ...args) {
-    return this._rpcCall(methodName, ...args);
+    return this._rpcCall(methodName, false, ...args);
+  }
+
+  /**
+   * @name rpcSend
+   * @summary 调用 rpc method, 不需要回复
+   *   methodName = '[instanceId@]serviceName.ping'
+   *   call('server1.ping', 'life')
+   *   call('instanceId@server1.ping', 'life')
+   * @param {string} methodName -
+   * @param {array} args -
+   * @return {object} -
+   */
+  rpcSend(methodName, ...args) {
+    return this._rpcCall(methodName, true, ...args);
   }
 
   /**
