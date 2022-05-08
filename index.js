@@ -35,6 +35,17 @@ const KEYS_PER_SCAN = '100';
 const UMF_INVALID_MESSAGE = 'UMF message requires "to", "from" and "body" fields';
 const INSTANCE_ID_NOT_SET = 'not set';
 
+// const rpcMethodKey = 'hydra:rpc-methods'; // methodName => serviceName
+
+/**
+* @name log
+* @params {array} args
+* @return {undefined}
+*/
+function log(..._args) {
+  // console.log('RPC:', ..._args);
+}
+
 /**
  * @name Hydra
  * @summary Base class for Hydra.
@@ -43,9 +54,9 @@ const INSTANCE_ID_NOT_SET = 'not set';
  */
 class Hydra extends EventEmitter {
   /**
-  * @name constructor
-  * @return {undefined}
-  */
+   * @name constructor
+   * @return {undefined}
+   */
   constructor() {
     super();
 
@@ -263,6 +274,7 @@ class Hydra extends EventEmitter {
           for (let plugin of this.registeredPlugins) {
             await plugin.onServiceReady();
           }
+          await this._initRPCCallRetMessage();
           resolve();
         } catch (err) {
           this._logMessage('error', err.toString());
@@ -293,15 +305,15 @@ class Hydra extends EventEmitter {
           this.config.serviceVersion = this.serviceVersion = this.config.serviceVersion || this._getParentPackageJSONVersion();
 
           /**
-          * Determine network DNS/IP for this service.
-          * - First check whether serviceDNS is defined. If so, this is expected to be a DNS entry.
-          * - Else check whether serviceIP exists and is not empty ('') and is not an segemented IP
-          *   such as 192.168.100.106 If so, then use DNS lookup to determine an actual dotted IP address.
-          * - Else check whether serviceIP exists and *IS* set to '' - that means the service author is
-          *   asking Hydra to determine the machine's IP address.
-          * - And final else - the serviceIP is expected to be populated with an actual dotted IP address
-          *   or serviceDNS contains a valid DNS entry.
-          */
+           * Determine network DNS/IP for this service.
+           * - First check whether serviceDNS is defined. If so, this is expected to be a DNS entry.
+           * - Else check whether serviceIP exists and is not empty ('') and is not an segemented IP
+           *   such as 192.168.100.106 If so, then use DNS lookup to determine an actual dotted IP address.
+           * - Else check whether serviceIP exists and *IS* set to '' - that means the service author is
+           *   asking Hydra to determine the machine's IP address.
+           * - And final else - the serviceIP is expected to be populated with an actual dotted IP address
+           *   or serviceDNS contains a valid DNS entry.
+           */
           if (this.config.serviceDNS && this.config.serviceDNS !== '') {
             this.config.serviceIP = this.config.serviceDNS;
             this._updateInstanceData();
@@ -326,7 +338,7 @@ class Hydra extends EventEmitter {
                   let interfaceMask = segments[1];
                   Object.keys(interfaces).
                     forEach((itf) => {
-                      interfaces[itf].forEach((interfaceRecord)=>{
+                      interfaces[itf].forEach((interfaceRecord) => {
                         if (itf === interfaceName && interfaceRecord.netmask === interfaceMask && interfaceRecord.family === 'IPv4') {
                           this.config.serviceIP = interfaceRecord.address;
                         }
@@ -340,7 +352,7 @@ class Hydra extends EventEmitter {
                 let firstSelected = false;
                 Object.keys(interfaces).
                   forEach((itf) => {
-                    interfaces[itf].forEach((interfaceRecord)=>{
+                    interfaces[itf].forEach((interfaceRecord) => {
                       if (!firstSelected && interfaceRecord.family === 'IPv4' && interfaceRecord.address !== '127.0.0.1') {
                         this.config.serviceIP = interfaceRecord.address;
                         firstSelected = true;
@@ -402,6 +414,7 @@ class Hydra extends EventEmitter {
       // 立即删除presence
       promises.push(this.redisdb.del(`${redisPreKey}:${this.serviceName}:${this.instanceID}:presence`));
       await Promise.all(promises);
+      await this._rpcQuit();
       await this.redisdb.quit();
     }
 
@@ -583,6 +596,8 @@ class Hydra extends EventEmitter {
 
           // Update presence immediately without waiting for next update interval.
           await this._updatePresence();
+
+          await this._initRPCCallMessage();
 
           resolve({
             serviceName: this.serviceName,
@@ -1342,7 +1357,7 @@ class Hydra extends EventEmitter {
    * @return {promise} promise - response from API in resolved promise or
    *                   error in rejected promise.
    */
-  _makeAPIRequest(message, sendOpts = { }) {
+  _makeAPIRequest(message, sendOpts = {}) {
     return new Promise((resolve, reject) => {
       let umfmsg = UMFMessage.createMessage(message);
       if (!umfmsg.validate()) {
@@ -1673,11 +1688,11 @@ class Hydra extends EventEmitter {
   }
 
   /**
-  * @name _listConfig
-  * @summary Return a list of config keys
-  * @param {string} serviceName - name of service
-  * @return {promise} promise - resolving or rejecting.
-  */
+   * @name _listConfig
+   * @summary Return a list of config keys
+   * @param {string} serviceName - name of service
+   * @return {promise} promise - resolving or rejecting.
+   */
   _listConfig(serviceName) {
     return new Promise((resolve, reject) => {
       this.redisdb.hkeys(`${redisPreKey}:${serviceName}:configs`, (err, result) => {
@@ -1698,58 +1713,58 @@ class Hydra extends EventEmitter {
   }
 
   /**
-  * @name _getClonedRedisClient
-  * @summary get a Redis client connection which points to the same Redis server that hydra is using
-  * @param {object} [options] - override options from original createClient call
-  * @param {function} [callback] - callback for async connect
-  * @return {object} - Redis Client
-  */
+   * @name _getClonedRedisClient
+   * @summary get a Redis client connection which points to the same Redis server that hydra is using
+   * @param {object} [options] - override options from original createClient call
+   * @param {function} [callback] - callback for async connect
+   * @return {object} - Redis Client
+   */
   _getClonedRedisClient(options, callback) {
     return this.redisdb.duplicate(options, callback);
   }
 
   /**
-  * @name _getUMFMessageHelper
-  * @summary returns UMF object helper
-  * @return {object} helper - UMF helper
-  */
-  _getUMFMessageHelper() {
+   * @name _getUMFMessageHelper
+   * @summary returns UMF object helper
+   * @return {object} helper - UMF helper
+   */
+  static _getUMFMessageHelper() {
     return require('./lib/umfmessage');
   }
 
   /**
-  * @name _getServerRequestHelper
-  * @summary returns ServerRequest helper
-  * @return {object} helper - service request helper
-  */
-  _getServerRequestHelper() {
+   * @name _getServerRequestHelper
+   * @summary returns ServerRequest helper
+   * @return {object} helper - service request helper
+   */
+  static _getServerRequestHelper() {
     return require('./lib/server-request');
   }
 
   /**
-  * @name _getServerResponseHelper
-  * @summary returns ServerResponse helper
-  * @return {object} helper - service response helper
-  */
-  _getServerResponseHelper() {
+   * @name _getServerResponseHelper
+   * @summary returns ServerResponse helper
+   * @return {object} helper - service response helper
+   */
+  static _getServerResponseHelper() {
     return require('./lib/server-response');
   }
 
   /**
-  * @name _getUtilsHelper
-  * @summary returns a utils helper
-  * @return {object} helper - utils helper
-  */
-  _getUtilsHelper() {
+   * @name _getUtilsHelper
+   * @summary returns a utils helper
+   * @return {object} helper - utils helper
+   */
+  static _getUtilsHelper() {
     return require('./lib/utils');
   }
 
   /**
-  * @name _getConfigHelper
-  * @summary returns a config helper
-  * @return {object} helper - config helper
-  */
-  _getConfigHelper() {
+   * @name _getConfigHelper
+   * @summary returns a config helper
+   * @return {object} helper - config helper
+   */
+  static _getConfigHelper() {
     return require('./lib/config');
   }
 
@@ -1902,10 +1917,10 @@ class Hydra extends EventEmitter {
   }
 
   /**
-  * @name _getParentPackageJSONVersion
-  * @summary Retrieve the version from the host app's package.json file.
-  * @return {string} version - package version
-  */
+   * @name _getParentPackageJSONVersion
+   * @summary Retrieve the version from the host app's package.json file.
+   * @return {string} version - package version
+   */
   _getParentPackageJSONVersion() {
     let version;
     try {
@@ -1916,6 +1931,271 @@ class Hydra extends EventEmitter {
       version = 'unspecified';
     }
     return version;
+  }
+
+
+  /*
+  RPC
+  channel:
+  hydra:rpc-ret:${instanceId} 传输结果
+  hydra:rpc-call:${instanceId} 传输调用
+  */
+
+  /**
+   * @name _rpcMethods
+   * @summary 添加多个方法
+   * @param {object} obj - {funcName: func}
+   * @return {object} this
+   */
+  _rpcMethods(obj) {
+    for (let funcName in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, funcName)) {
+        this._rpcMethod(funcName, obj[funcName]);
+      }
+    }
+    return this;
+  }
+
+  /**
+   * @name _rpcMethod
+   * @summary 添加method
+   * @param {string} funcName -
+   * @param {function} fn -
+   * @return {object} this
+   */
+  _rpcMethod(funcName, fn) {
+    // this.redisdb.hset(rpcMethodKey, `${funcName}`, this.funcName); // serviceName.methodName => serviceName
+    this._rpcHandlers[funcName] = fn;
+    return this;
+  }
+
+  /**
+   * @name _rpcQuit
+   * @summary quit rpc
+   * @return {void}
+   */
+  _rpcQuit() {
+    let calls = [this._callRetMessageRedis.quit()];
+    if (this._callMessageRedis) {
+      calls.push(this._callMessageRedis.quit());
+    }
+    return Promise.all(calls);
+  }
+
+  /**
+   * @name _subscribeUntilSuccess
+   * @summary 订阅直到成功
+   * @param {object} client - Redis client
+   * @param {string} channel -
+   * @return {void}
+   */
+  async _subscribeUntilSuccess(client, channel) {
+    let count = 0;
+    while (count++ < 10) {
+      let ret = await client.subscribe(channel);
+      if (ret) {
+        return true;
+      }
+    }
+    throw new Error('subscribe failed: ' + channel);
+  }
+
+  /**
+   * @name _publishUntilSuccess
+   * @summary 发布直到成功
+   * @param {object} client - Redis client
+   * @param {string} channel -
+   * @param {string} msg -
+   * @return {void}
+   */
+  async _publishUntilSuccess(client, channel, msg) {
+    let count = 0;
+    while (count++ < 10) {
+      let ret = await client.publish(channel, msg);
+      if (ret) {
+        return true;
+      }
+      await Utils.sleep(10);
+      log('publish', channel, ret);
+    }
+    throw new Error('publish failed: ' + channel + ' ' + msg);
+  }
+
+  /**
+   * @name _initRPCCallMessage
+   * @summary 获取别人的调用消息
+   * @return {void}
+   */
+  async _initRPCCallMessage() {
+    this._rpcHandlers = {}; // methodName => fn
+
+    const sub = this.redisdb.duplicate();
+    this._callMessageRedis = sub;
+    // sub.on('ready', () => {
+    //     log('rpc-call ready')
+    // })
+    sub.on('error', (err) => {
+      log('rpc-call error', err);
+    });
+    // 收到别人的调用, 处理, 并将结果发到channel中
+    sub.on('message', async(channel, message) => {
+      log('get call message', message);
+      const {id, frm, funcName, args} = JSON.parse(message);
+      const handler = this._rpcHandlers[funcName];
+      if (!handler) {
+        let msg = `No ${funcName} on ${this.serviceName}`;
+        this._logMessage('error', msg);
+        // throw new Error(msg);
+        await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, err: msg}));
+        return;
+      }
+      const data = await handler.apply(handler, args);
+      // log(data)
+      // 将结果发到channel 为 rcp-ret:instanceId
+      // let publishRet = await this.redisdb.publish('rpc-ret:' + instanceId, JSON.stringify({ id, data: data }));
+      let publishRet = await this._publishUntilSuccess(this.redisdb, `hydra:rpc-ret:${frm}`, JSON.stringify({id, data: data}));
+      log('publish ret', publishRet);
+    });
+    // 监听别人的调用, 如果这里没有成功, 别人publish会返回0
+    // sub.subscribe(`rpc:${this.instanceId}`);
+    await this._subscribeUntilSuccess(sub, `hydra:rpc-call:${this.instanceID}`);
+
+    // 添加一些通用的方法
+    this._rpcMethods({
+      getInstanceID: () => {
+        return this._getInstanceID();
+      }
+    });
+  }
+
+  /**
+   * @name _initRPCCallRetMessage
+   * @summary 不是服务, 只是调用方, 不用处理别人的调用 调用后得到消息, 结果消息
+   * @return {void}
+   */
+  async _initRPCCallRetMessage() {
+    this._callResolveM = {}; // id => { resolve, reject }
+    this._callTimerM = {}; // id => setTimeout()
+    const sub = this.redisdb.duplicate();
+    this._callRetMessageRedis = sub;
+    // sub.on('ready', () => {
+    //     log('initRPCCallRetMessage ready')
+    // })
+    sub.on('error', (error) => {
+      log('initRPCCallRetMessage error', error);
+    });
+    sub.on('message', (channel, message) => {
+      // log('get ret message', message)
+      const ret = JSON.parse(message);
+      const resolveAndReject = this._callResolveM[ret.id];
+      if (resolveAndReject) {
+        const {resolve, reject} = resolveAndReject;
+        if (!ret.err) {
+          resolve(ret.data);
+        } else {
+          reject(ret.err);
+        }
+        delete this._callResolveM[ret.id];
+        clearTimeout(this._callTimerM[ret.id]);
+        delete this._callTimerM[ret.id];
+      } else {
+        // 没有, 那是因为超时了不用处理
+        log('initRPCCallRetMessage 超时不用处理', ret);
+      }
+    });
+    // 监听channel id, 结果
+    // log(id)
+    await this._subscribeUntilSuccess(sub, `hydra:rpc-ret:${this.instanceID}`);
+  }
+
+  /**
+   * @name _parseMethodName
+   * @summary 从methodName解析出 serviceName instanceID funcName
+   * methodName = serviceName.funcName
+   * smethodName = instanceId@serviceName.funcName
+   * @param {string} methodName -
+   * @return {object} {serviceName, instanceID, funcName}
+   */
+  _parseMethodName(methodName) {
+    let serviceName = '';
+    let instanceID = '';
+    let funcName = '';
+    let arr = methodName.split('.');
+    if (arr.length === 1) {
+      throw new Error('Invalid methodName');
+    }
+    let serviceNameAndInstanceID = arr[0];
+    if (serviceNameAndInstanceID.includes('@')) {
+      let arr2 = serviceNameAndInstanceID.split('@');
+      instanceID = arr2[0];
+      serviceName = arr2[1];
+    } else {
+      serviceName = serviceNameAndInstanceID;
+    }
+    // funcName
+    arr.shift();
+    funcName = arr.join('.');
+
+    return {
+      serviceName,
+      instanceID,
+      funcName
+    };
+  }
+
+  /**
+   * @name _rpcCall
+   * @summary 调用 rpc method
+   *   methodName = '[instanceId@]serviceName.ping'
+   *   call('server1.ping', 'life')
+   *   call('instanceId@server1.ping', 'life')
+   * @param {string} methodName -
+   * @param {array} args -
+   * @return {object} -
+   */
+  async _rpcCall(methodName, ...args) {
+    const id = uuid.v4();
+    // const serviceName = await this.redisdb.hget(rpcMethodKey, methodName);
+    let {
+      serviceName,
+      instanceID,
+      funcName
+    } = this._parseMethodName(methodName);
+    log('methodName', serviceName, instanceID, funcName);
+    const instances = await this._getServicePresence(serviceName);
+    if (!instances || !instances.length) {
+      let msg = `Unavailable ${serviceName} instances`;
+      this._logMessage('error', msg);
+      throw new Error(msg);
+    }
+
+    if (instanceID) {
+      let found = instances.filter((entry) => entry.instanceID === instanceID);
+      if (!found.length) {
+        let msg = `Unavailable ${serviceName} instance named ${instanceID}`;
+        this._logMessage('error', msg);
+        throw new Error(msg);
+      }
+    } else {
+      instanceID = instances[0].instanceID;
+    }
+
+    const result = new Promise((resolve, reject) => {
+      let timer = setTimeout(() => {
+        if (this._callResolveM[id]) {
+          delete this._callResolveM[id];
+          delete this._callTimerM[id];
+          reject(new Error('rpc timeout'));
+        }
+      }, this.config.timeout || 5000);
+
+      this._callResolveM[id] = {resolve, reject};
+      this._callTimerM[id] = timer;
+
+      // publish
+      this._publishUntilSuccess(this.redisdb, `hydra:rpc-call:${instanceID}`, JSON.stringify({id, frm: this.instanceID, funcName, args}));
+    });
+    return result;
   }
 }
 
@@ -1949,11 +2229,11 @@ class IHydra extends Hydra {
   }
 
   /**
-  * @name use
-  * @summary Use plugins
-  * @param {array} plugins - plugins to process
-  * @return {undefined}
-  */
+   * @name use
+   * @summary Use plugins
+   * @param {array} plugins - plugins to process
+   * @return {undefined}
+   */
   use(...plugins) {
     return super.use(...plugins);
   }
@@ -2113,7 +2393,7 @@ class IHydra extends Hydra {
    * @return {promise} promise - response from API in resolved promise or
    *                   error in rejected promise.
    */
-  makeAPIRequest(message, sendOpts = { }) {
+  makeAPIRequest(message, sendOpts = {}) {
     return super._makeAPIRequest(message, sendOpts);
   }
 
@@ -2236,11 +2516,11 @@ class IHydra extends Hydra {
   }
 
   /**
-  * @name listConfig
-  * @summary Return a list of config keys
-  * @param {string} serviceName - name of service
-  * @return {promise} promise - resolving or rejecting.
-  */
+   * @name listConfig
+   * @summary Return a list of config keys
+   * @param {string} serviceName - name of service
+   * @return {promise} promise - resolving or rejecting.
+   */
   listConfig(serviceName) {
     return super._listConfig(serviceName);
   }
@@ -2258,56 +2538,56 @@ class IHydra extends Hydra {
   }
 
   /**
-  * @name getClonedRedisClient
-  * @summary get a Redis client connection which points to the same Redis server that hydra is using
-  * @return {object} - Redis Client
-  */
+   * @name getClonedRedisClient
+   * @summary get a Redis client connection which points to the same Redis server that hydra is using
+   * @return {object} - Redis Client
+   */
   getClonedRedisClient() {
     return super._getClonedRedisClient();
   }
 
   /**
-  * @name getUMFMessageHelper
-  * @summary returns UMF object helper
-  * @return {object} helper - UMF helper
-  */
-  getUMFMessageHelper() {
+   * @name getUMFMessageHelper
+   * @summary returns UMF object helper
+   * @return {object} helper - UMF helper
+   */
+  static getUMFMessageHelper() {
     return super._getUMFMessageHelper();
   }
 
   /**
-  * @name getServerRequestHelper
-  * @summary returns ServerRequest helper
-  * @return {object} helper - service request helper
-  */
-  getServerRequestHelper() {
+   * @name getServerRequestHelper
+   * @summary returns ServerRequest helper
+   * @return {object} helper - service request helper
+   */
+  static getServerRequestHelper() {
     return super._getServerRequestHelper();
   }
 
   /**
-  * @name getServerResponseHelper
-  * @summary returns ServerResponse helper
-  * @return {object} helper - service response helper
-  */
-  getServerResponseHelper() {
+   * @name getServerResponseHelper
+   * @summary returns ServerResponse helper
+   * @return {object} helper - service response helper
+   */
+  static getServerResponseHelper() {
     return super._getServerResponseHelper();
   }
 
   /**
-  * @name getUtilsHelper
-  * @summary returns a Utils helper
-  * @return {object} helper - utils helper
-  */
-  getUtilsHelper() {
+   * @name getUtilsHelper
+   * @summary returns a Utils helper
+   * @return {object} helper - utils helper
+   */
+  static getUtilsHelper() {
     return super._getUtilsHelper();
   }
 
   /**
-  * @name getConfigHelper
-  * @summary returns a config helper
-  * @return {object} helper - config helper
-  */
-  getConfigHelper() {
+   * @name getConfigHelper
+   * @summary returns a config helper
+   * @return {object} helper - config helper
+   */
+  static getConfigHelper() {
     return super._getConfigHelper();
   }
 
@@ -2337,11 +2617,11 @@ class IHydra extends Hydra {
   */
 
   /**
-  * @name _splitBdyFromMsg
-  * @summary _splitBdyFromMsg
-  * @param {object} msg - 收到的消息
-  * @return {object} 将bdy放在顶级
-  */
+   * @name _splitBdyFromMsg
+   * @summary _splitBdyFromMsg
+   * @param {object} msg - 收到的消息
+   * @return {object} 将bdy放在顶级
+   */
   _splitBdyFromMsg(msg) {
     const bdy = Object.assign({}, msg.bdy);
     // delete msg.bdy
@@ -2350,11 +2630,11 @@ class IHydra extends Hydra {
   }
 
   /**
-  * @name proxyMessage
-  * @summary 代理消息
-  * @param {function} callback - 消息回调
-  * @return {void}
-  */
+   * @name proxyMessage
+   * @summary 代理消息
+   * @param {function} callback - 消息回调
+   * @return {void}
+   */
   proxyMessage(callback) {
     this._resolves = {};
     // 其它服务发消息给我
@@ -2388,14 +2668,14 @@ class IHydra extends Hydra {
   }
 
   /**
-  * @name call
-  * @summary 一问一答
-  * @param {string} method - 方法
-  * @param {object} bdy - 消息
-  * @param {string} toServiceName - toServiceName
-  * @param {string} toInstanceId - toInstanceId
-  * @return {void}
-  */
+   * @name call
+   * @summary 一问一答
+   * @param {string} method - 方法
+   * @param {object} bdy - 消息
+   * @param {string} toServiceName - toServiceName
+   * @param {string} toInstanceId - toInstanceId
+   * @return {void}
+   */
   async call(method, bdy, toServiceName, toInstanceId) {
     let msg = await this.send(method, bdy, toServiceName, toInstanceId);
     // console.log('this.config.timeout', this.config.timeout)
@@ -2414,14 +2694,14 @@ class IHydra extends Hydra {
   }
 
   /**
-  * @name send
-  * @summary 仅发送
-  * @param {string} method - 方法
-  * @param {object} bdy - 消息
-  * @param {string} toServiceName - toServiceName
-  * @param {string} toInstanceId - toInstanceId
-  * @return {void}
-  */
+   * @name send
+   * @summary 仅发送
+   * @param {string} method - 方法
+   * @param {object} bdy - 消息
+   * @param {string} toServiceName - toServiceName
+   * @param {string} toInstanceId - toInstanceId
+   * @return {void}
+   */
   async send(method, bdy, toServiceName, toInstanceId) {
     let to = `${toServiceName}:/`;
     if (toInstanceId) {
@@ -2441,16 +2721,53 @@ class IHydra extends Hydra {
   }
 
   /**
-  * @name reply
-  * @summary 回复
-  * @param {object} bdy - 消息
-  * @param {object} preMsg - 之前收到的消息
-  * @return {void}
-  */
+   * @name reply
+   * @summary 回复
+   * @param {object} bdy - 消息
+   * @param {object} preMsg - 之前收到的消息
+   * @return {void}
+   */
   async reply(bdy, preMsg) {
     return this.sendReplyMessage(preMsg, this.createUMFMessage({
       bdy
     }));
+  }
+
+  // RPC
+
+  /**
+   * @name rpcCall
+   * @summary 调用 rpc method
+   *   methodName = '[instanceId@]serviceName.ping'
+   *   call('server1.ping', 'life')
+   *   call('instanceId@server1.ping', 'life')
+   * @param {string} methodName -
+   * @param {array} args -
+   * @return {object} -
+   */
+  rpcCall(methodName, ...args) {
+    return this._rpcCall(methodName, ...args);
+  }
+
+  /**
+   * @name rpcMethods
+   * @summary 添加多个方法
+   * @param {object} obj - {funcName: func}
+   * @return {object} this
+   */
+  rpcMethods(obj) {
+    return this._rpcMethods(obj);
+  }
+
+  /**
+   * @name rpcMethod
+   * @summary 添加method
+   * @param {string} methodName -
+   * @param {function} fn -
+   * @return {object} this
+   */
+  rpcMethod(methodName, fn) {
+    return this._rpcMethod(methodName, fn);
   }
 }
 

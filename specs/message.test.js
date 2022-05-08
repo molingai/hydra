@@ -1,4 +1,7 @@
-const Hydra = require('../index.js');
+/* eslint no-invalid-this: 0 */
+/* eslint semi: ["error", "always"] */
+
+const {Hydra} = require('../index.js');
 
 const redisPort = 6379;
 const redisUrl = '127.0.0.1';
@@ -7,7 +10,8 @@ const SECOND = 1000;
 /**
  * @name getConfig
  * @summary Get a new copy of a config object
- * @return {undefined}
+ * @param {string} serviceName -
+ * @return {object} -
  */
 function getConfig(serviceName) {
   return Object.assign({}, {
@@ -23,6 +27,12 @@ function getConfig(serviceName) {
   });
 }
 
+/**
+ * @name registerService
+ * @param {string} serviceName -
+ * @param {boolean} flushdb -
+ * @return {object} -
+ */
 async function registerService(serviceName, flushdb) {
   const hydra = new Hydra();
   await hydra.init(getConfig(serviceName));

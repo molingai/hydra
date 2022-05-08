@@ -173,6 +173,10 @@ export type Presence = {
   updatedOnTS: number // 1651054825289
 }
 
+type String2Func = {
+  [key: string]: Function
+}
+
 export class Hydra extends EventEmitter {
   /**
    * @name init
@@ -313,6 +317,28 @@ export class Hydra extends EventEmitter {
   call (method: string, bdy: any, toServiceName: string, toInstanceId?: string): Promise<CallReply>
   reply (bdy: any, preMsg: Message): Promise<void>
   send (method: string, bdy: any, toServiceName: string, toInstanceId?: string): Promise<UMFMessage>
+
+  // RPC
+
+  /**
+   * 调用方法
+   * @param methodName [instanceId@]serviceName.functionName 如 service1.ping, instanceId@service1.ping
+   * @param args
+   */
+  rpcCall(methodName: string, ...args: any[]): Promise<any>
+
+  /**
+   * 添加多个
+   * @param obj
+   */
+  rpcMethods(obj: String2Func): Hydra
+
+  /**
+   * 添加方法
+   * @param name
+   * @param func
+   */
+  rpcMethod(name: string, func: Function): Hydra
 }
 
 let hydra: Hydra

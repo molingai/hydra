@@ -1,4 +1,4 @@
-const Hydra = require('../../index');
+const {Hydra} = require('../../index');
 const hydra = new Hydra();
 const config = {
   hydra: {
