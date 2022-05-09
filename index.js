@@ -2023,7 +2023,7 @@ class Hydra extends EventEmitter {
 
   /**
    * @name _initRPCCallMessage
-   * @summary 获取别人的调用消息
+   * @summary 获取别人的调用消息, 只有service才有这个功能
    * @return {void}
    */
   async _initRPCCallMessage() {
