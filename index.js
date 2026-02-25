@@ -1266,6 +1266,29 @@ class Hydra extends EventEmitter {
     });
   }
 
+  // life
+  // ${redisPreKey}:${serviceName}:${instanceID}:presence -> instanceID
+  // 如果有, 则表示活跃
+  getServicePresenceByInstanceID(serviceName, instanceID) {
+    return new Promise((resolve, reject) => {
+      this.redisdb.get(`${redisPreKey}:${serviceName}:${instanceID}:presence`, (err, _result) => {
+        if (err) {
+          reject(err);
+        } else {
+          // _result === instanceID
+          if (_result === instanceID) {
+            this.redisdb.hget(`${redisPreKey}:nodes`, instanceID, (err, result) => {
+              resolve(result)
+            })
+          }
+          else {
+            reject('no presence')
+          }
+        }
+      });
+    });
+  }
+
   /**
    * @name _tryAPIRequest
    * @summary Attempt an API request to a hydra service.

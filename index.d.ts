@@ -291,6 +291,15 @@ export class Hydra extends EventEmitter {
   hasServicePresence(name): Promise<boolean>
 
   /**
+   * @name getServicePresenceByInstanceID
+   * @summary Retrieve a service / instance's presence info.
+   * @param {string} serviceName - service name - note service name is case insensitive
+   * @param {string} instanceID - instanceID
+   * @return {promise} promise - which resolves with service presence
+   */
+  getServicePresenceByInstanceID(serviceName: string, instanceID: string): Promise<Presence | null>
+
+  /**
    * @name getInstanceID
    * @summary Return the instance id for this process
    * @return {number} id - instanceID
